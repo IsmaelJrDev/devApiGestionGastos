@@ -18,11 +18,11 @@ app.use("/user", userRouters);
 app.use("/category", CategoryRoutes);
 app.use("/transaction", TransactionRoutes);
 
-// ANOTACIÓN: El middleware de manejo de errores DEBE ir después de las rutas.
-// De esta forma, puede capturar cualquier error que ocurra en los controladores.
+// El middleware de manejo de errores tiene que ir después de las rutas, de esta forma, puede capturar cualquier error que ocurra en los controladores.
 app.use(handleError);
 
-mongoose.connect(process.env.MONGO_URL)
+mongoose
+    .connect(process.env.MONGO_URL)
     .then(() => {
         console.log("Base de datos conectada");
         app.listen(process.env.PORT || 3000, () => {

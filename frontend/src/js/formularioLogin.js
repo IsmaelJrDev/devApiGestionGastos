@@ -1,39 +1,63 @@
-import apiClient from '../services/api';
+import apiClient from "../services/conexion.service";
 
+/**
+ * Maneja el inicio de sesión del usuario.
+ * @param {string} email - El correo electrónico del usuario.
+ * @param {string} password - La contraseña del usuario.
+ * @returns {Promise<object>} Los datos de la respuesta del inicio de sesión.
+ * @throws {Error} Si la solicitud falla, lanza un error con un mensaje descriptivo.
+ */
 export const login = async (email, password) => {
     try {
-        const response = await apiClient.post('/user/login', { email, password });
+        const response = await apiClient.post("/user/login", {
+            email,
+            password,
+        });
         if (response.data.token) {
-            // Guardamos el token en localStorage para usarlo en futuras peticiones
-            localStorage.setItem('token', response.data.token);
+            // Almacena el token en localStorage para futuras autenticaciones
+            localStorage.setItem("token", response.data.token);
         }
         return response.data;
     } catch (error) {
-        // ANOTACIÓN: Propagación de error mejorada.
-        // Si el backend envía un error estructurado (como lo hará ahora),
-        // lanzamos el mensaje específico. De lo contrario, lanzamos un mensaje genérico.
-        if (error.response && error.response.data && error.response.data.message) {
+        // Centraliza el manejo de errores para mensajes específicos del backend o genéricos
+        if (error.response?.data?.message) {
             throw new Error(error.response.data.message);
         }
-        throw new Error('Error de conexión o del servidor.');
+        throw new Error(
+            "Error al iniciar sesión. Por favor, intenta de nuevo."
+        );
     }
 };
 
+/**
+ * Maneja el registro de un nuevo usuario.
+ * @param {string} email - El correo electrónico del nuevo usuario.
+ * @param {string} password - La contraseña del nuevo usuario.
+ * @returns {Promise<object>} Los datos de la respuesta del registro.
+ * @throws {Error} Si la solicitud falla, lanza un error con un mensaje descriptivo.
+ */
 export const register = async (email, password) => {
     try {
-        const response = await apiClient.post('/user/register', { email, password });
+        const response = await apiClient.post("/user/register", {
+            email,
+            password,
+        });
+
         return response.data;
     } catch (error) {
-        if (error.response && error.response.data && error.response.data.message) {
+        // Centraliza el manejo de errores para mensajes específicos del backend o genéricos
+        if (error.response?.data?.message) {
             throw new Error(error.response.data.message);
         }
-        throw new Error('No se pudo completar el registro.');
+        throw new Error(
+            "Error al registrar usuario. Intenta con un correo diferente o más tarde."
+        );
     }
 };
 
-// Función para cerrar sesión, limpia el token.
 export const logout = () => {
-    localStorage.removeItem('token');
-    // Para asegurar que el usuario es redirigido a la página de login.
+    localStorage.removeItem("token");
+    // Para una experiencia de usuario más fluida, considera usar un enrutador (e.g., React Router)
+    // para navegar programáticamente en lugar de recargar la página.
     window.location.reload();
 };

@@ -1,69 +1,113 @@
 const TransactionModel = require("../models/Transaction.model");
 
-/**
- * Servicio principal para el filtrado, con la corrección definitiva para fechas.
- */
 exports.getByFilters = async (userId, filters) => {
     let query = { user: userId };
 
-    if (filters.type) {
+    if (filters.searchText) {
+        const searchRegex = new RegExp(filters.searchText, "i"); // Case-insensitive regex
+
+        // Try to parse the searchText as a date
+        const parsedDate = new Date(filters.searchText);
+        const isDate = !isNaN(parsedDate.getTime());
+
+        // Build an $or query to search across multiple fields
+        query.$or = [
+            { description: searchRegex }, // Search by description
+            { type: searchRegex }, // Search by type (Ingreso/Egreso)
+        ];
+
+        if (isDate) {
+            const startDate = new Date(
+                parsedDate.getFullYear(),
+                parsedDate.getMonth(),
+                parsedDate.getDate(),
+                0,
+                0,
+                0
+            );
+            const endDate = new Date(
+                parsedDate.getFullYear(),
+                parsedDate.getMonth(),
+                parsedDate.getDate(),
+                23,
+                59,
+                59,
+                999
+            );
+            query.$or.push({ date: { $gte: startDate, $lte: endDate } });
+        }
+
+        // To search by category name, we need to populate categories first
+        const categories = await TransactionModel.distinct("category", {
+            user: userId,
+        });
+        const categoryIdsToSearch = [];
+
+        for (const catId of categories) {
+            const category = await TransactionModel.populate(
+                {
+                    path: "category",
+                    match: { name: searchRegex },
+                },
+                {
+                    _id: catId,
+                }
+            );
+            if (category && category.category) {
+                categoryIdsToSearch.push(category.category._id);
+            }
+        }
+
+        if (categoryIdsToSearch.length > 0) {
+            query.$or.push({ category: { $in: categoryIdsToSearch } });
+        }
+    }
+
+    // If other specific filters (like type or date) are still passed, they will be applied
+    // independently or combined with the searchText if they are not part of $or.
+    // Given the single input request, we are primarily focusing on searchText.
+    if (filters.type && !filters.searchText) {
+        // Only apply if searchText is not present to avoid redundancy
         query.type = filters.type;
     }
 
-    // Si en los filtros viene una 'date', procesamos el rango.
-    if (filters.date) { // El formato de filters.date es 'YYYY-MM-DD'
-        
-        // ==================================================================
-        // INICIO DE LA CORRECCIÓN DEFINITIVA DE ZONA HORARIA
-        // ==================================================================
-        //
-        // Forzamos a JavaScript a interpretar la fecha en la ZONA HORARIA LOCAL DEL SERVIDOR
-        // añadiendo la hora al final de la cadena. Esto evita la interpretación
-        // automática a UTC que causa el problema.
-
-        // Crea una fecha para el inicio del día seleccionado (00:00:00) en la zona local del servidor.
+    if (filters.date && !filters.searchText) {
+        // Only apply if searchText is not present
         const startDate = new Date(`${filters.date}T00:00:00`);
-
-        // Crea una fecha para el final del día seleccionado (23:59:59) en la zona local del servidor.
         const endDate = new Date(`${filters.date}T23:59:59.999`);
-
-        // Con este rango, la consulta a MongoDB buscará todas las transacciones
-        // que ocurrieron durante las 24 horas del día seleccionado, respetando
-        // la zona horaria en la que fueron guardadas.
         query.date = { $gte: startDate, $lte: endDate };
-        
-        // Para depuración: puedes descomentar la siguiente línea para ver en la consola del backend
-        // el rango exacto que se está enviando a la base de datos.
-        // console.log("Querying date range:", query.date);
-        // ==================================================================
-        // FIN DE LA CORRECCIÓN
-        // ==================================================================
     }
 
-    // Ejecutamos la consulta con todos los filtros aplicados.
     return await TransactionModel.find(query)
-        .populate('category')
+        .populate("category")
         .sort({ date: -1 });
 };
 
 exports.create = async (data, userId) => {
     const transaction = new TransactionModel({
         ...data,
-        user: userId
+        user: userId,
     });
-    const savedTransaction = await transaction.save();
-    return savedTransaction.populate('category');
+    const savedTransaction = await transaction.save(); // Saves the new transaction to the database
+    return savedTransaction.populate("category"); // Populates the category field of the saved transaction
 };
 
 exports.getAll = async (userId) => {
     return await TransactionModel.find({ user: userId })
-        .populate('category')
+        .populate("category")
         .sort({ date: -1 });
 };
 
 exports.getRecent = async (userId) => {
     return await TransactionModel.find({ user: userId })
-        .populate('category')
+        .populate("category")
         .sort({ date: -1 })
         .limit(6);
+};
+
+exports.deleteTransaction = async (transactionId, userId) => {
+    return await TransactionModel.findOneAndDelete({
+        _id: transactionId,
+        user: userId,
+    });
 };
