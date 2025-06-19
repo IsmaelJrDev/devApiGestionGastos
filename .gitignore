@@ -1,0 +1,13 @@
+frontend/public
+frontend/src/App.css
+frontend/src/main.jsx
+frontend/.gitignore
+frontend/eslint.config.js
+frontend/package-lock.json
+frontend/package.json
+frontend/README.md
+
+backend/mongodb
+backend/node_modules
+backend/package-lock.json
+backend/package.json
